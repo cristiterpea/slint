@@ -963,6 +963,7 @@ fn generate_rtti() -> HashMap<&'static str, Rc<ItemRTTI>> {
             rtti_for::<Empty>(),
             rtti_for::<ImageItem>(),
             rtti_for::<ClippedImage>(),
+            rtti_for::<LottieAnimation>(),
             rtti_for::<ComplexText>(),
             rtti_for::<SimpleText>(),
             rtti_for::<Rectangle>(),
