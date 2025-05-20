@@ -72,6 +72,13 @@ export component ClippedImage inherits ImageItem {
 
 export { ClippedImage as Image }
 
+export component LottieAnimation inherits Empty {
+    in property <length> width;
+    in property <length> height;
+    in property <string> source;
+    in property <float> progress;
+}
+
 export component ComponentContainer inherits Empty {
     in property <component-factory> component-factory;
     out property <bool> has-component;
