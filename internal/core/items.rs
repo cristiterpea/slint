@@ -54,6 +54,8 @@ mod input_items;
 pub use input_items::*;
 mod image;
 pub use self::image::*;
+mod lottie;
+pub use lottie::*;
 #[cfg(feature = "std")]
 mod path;
 pub use crate::menus::MenuItem;
@@ -1604,6 +1606,10 @@ declare_item_vtable! {
 
 declare_item_vtable! {
     fn slint_get_ClippedImageVTable() -> ClippedImageVTable for ClippedImage
+}
+
+declare_item_vtable! {
+    fn slint_get_LottieAnimationVTable() -> LottieAnimationVTable for LottieAnimation
 }
 
 #[cfg(feature = "std")]

@@ -287,6 +287,7 @@ fn gen_corelib(
         "BorderRectangle",
         "ImageItem",
         "ClippedImage",
+        "LottieAnimation",
         "TouchArea",
         "FocusScope",
         "SwipeGestureHandler",
