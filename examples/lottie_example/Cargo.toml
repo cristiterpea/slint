@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[[bin]]
+name = "lottie_example" # Specifies the output binary name
+path = "main.rs"       # Specifies the entry point
+
 [dependencies]
 slint = { path = "../../api/rs/slint" } # Assuming this path based on the workspace root
 rlottie-rs = "0.7" # Check crates.io for the latest version
