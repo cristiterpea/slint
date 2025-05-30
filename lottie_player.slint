@@ -1,0 +1,102 @@
+// Slint component for playing Lottie animations.
+// It uses a global `Lottie` object, intended to be implemented in Rust,
+// to handle the actual loading and frame rendering of Lottie files.
+
+// The Lottie global provides an interface to the Rust backend for Lottie processing.
+export global Lottie {
+    // Attempts to load a Lottie animation from the given file path.
+    // Returns an integer handle (>=0 for success, <0 for error).
+    callback load_lottie(string) -> int;
+    // Renders the current frame for the Lottie animation specified by the handle.
+    // The `string` parameter is reserved for optional theme data (currently unused).
+    // Returns an image object for the frame and a boolean indicating if the animation has finished.
+    callback render_frame(int, string) -> { frame: image, is_finished: bool };
+    // Deletes/releases the Lottie animation associated with the given handle.
+    callback delete_lottie(int);
+    // Resets the Lottie animation associated with the given handle to its first frame.
+    callback reset_animation(int);
+}
+
+// LottiePlayer component definition
+export component LottiePlayer {
+    // Input property: The file path or URL of the Lottie animation to be played.
+    in property <string> source;
+    // Input/Output property: Controls whether the animation is currently playing.
+    // Defaults to true. Can be changed at runtime.
+    in-out property <bool> playing: true;
+    // Input/Output property: Controls whether the animation should loop back to the beginning
+    // when it finishes. Defaults to true.
+    in-out property <bool> loop: true;
+
+    // Private property to store the handle of the currently loaded Lottie animation.
+    // A negative value indicates no animation is loaded or an error occurred.
+    private property <int> lottie_handle: -1;
+
+    private function load_animation(path: string) {
+        if (root.lottie_handle >= 0) {
+            Lottie.delete_lottie(root.lottie_handle);
+            root.lottie_handle = -1;
+        }
+        if (!path.empty) {
+            root.lottie_handle = Lottie.load_lottie(path);
+            if (root.lottie_handle < 0) {
+                print("Error loading Lottie: \{path}, error code: \{root.lottie_handle}");
+                frame_image.source = @image-url("error.png"); // Optional: show an error image
+            } else {
+                // Attempt to render the first frame immediately
+                var frame_data = Lottie.render_frame(root.lottie_handle, "");
+                frame_image.source = frame_data.frame;
+                if (frame_data.is_finished && root.loop) {
+                    Lottie.reset_animation(root.lottie_handle);
+                }
+                // Timer running state will be updated by its binding
+            }
+        } else {
+            frame_image.source = new image(); // Clear the image
+        }
+    }
+
+    init => {
+        root.load_animation(root.source);
+    }
+
+    source_changed => {
+        root.load_animation(root.source);
+    }
+
+    removed => {
+        if (root.lottie_handle >= 0) {
+            Lottie.delete_lottie(root.lottie_handle);
+            root.lottie_handle = -1;
+        }
+    }
+
+    Image {
+        id: frame_image;
+        source: @image-url("placeholder.png"); // Placeholder for now
+    }
+
+    Timer {
+        id: frame_timer;
+        interval: 33ms;
+        repeat: true;
+        running: root.lottie_handle >= 0 && root.playing;
+        triggered => {
+            if (root.lottie_handle >= 0) {
+                var frame_data = Lottie.render_frame(root.lottie_handle, "");
+                frame_image.source = frame_data.frame;
+
+                if (frame_data.is_finished) {
+                    if (root.loop) {
+                        Lottie.reset_animation(root.lottie_handle);
+                        // Optional: render the first frame of the new loop immediately
+                        // var next_frame_data = Lottie.render_frame(root.lottie_handle, "");
+                        // frame_image.source = next_frame_data.frame;
+                    } else {
+                        root.playing = false; // Stop playback if not looping and finished
+                    }
+                }
+            }
+        }
+    }
+}

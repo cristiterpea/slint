@@ -1,0 +1,15 @@
+import { LottiePlayer } from "../../lottie_player.slint"; // Path to the component
+
+export component MainWindow inherits Window {
+    width: 400px;
+    height: 400px;
+
+    LottiePlayer {
+        id: player;
+        source: "test.json"; // User needs to provide this file
+        width: 100%;
+        height: 100%;
+        playing: true;
+        loop: true;
+    }
+}
