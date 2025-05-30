@@ -8,9 +8,8 @@ export global Lottie {
     // Returns an integer handle (>=0 for success, <0 for error).
     callback load_lottie(string) -> int;
     // Renders the current frame for the Lottie animation specified by the handle.
-    // The `string` parameter is reserved for optional theme data (currently unused).
     // Returns an image object for the frame and a boolean indicating if the animation has finished.
-    callback render_frame(int, string) -> { frame: image, is_finished: bool };
+    callback render_frame(int) -> { frame: image, is_finished: bool };
     // Deletes/releases the Lottie animation associated with the given handle.
     callback delete_lottie(int);
     // Resets the Lottie animation associated with the given handle to its first frame.
@@ -31,37 +30,72 @@ export component LottiePlayer {
     // Private property to store the handle of the currently loaded Lottie animation.
     // A negative value indicates no animation is loaded or an error occurred.
     private property <int> lottie_handle: -1;
+    // Internal properties to store the result of the last call to Lottie.render_frame
+    private property <image> _last_rendered_frame: @image-url("placeholder.png");
+    private property <bool> _is_last_frame_finished: false;
 
-    private function load_animation(path: string) {
+    // Internal callback to fetch and process the current frame data from the Lottie global.
+    callback _update_current_frame_data();
+    _update_current_frame_data => {
+        if (root.lottie_handle >= 0) {
+            debug("Calling Lottie.render_frame for handle: \{root.lottie_handle}");
+            // Call Lottie.render_frame once and store its results
+            let frame_data = Lottie.render_frame(root.lottie_handle);
+            root._last_rendered_frame = frame_data.frame;
+            root._is_last_frame_finished = frame_data.is_finished;
+            // Update the displayed image
+            frame_image.source = root._last_rendered_frame;
+        } else {
+            // Ensure clean state if no handle (e.g. after error or source cleared)
+            root._last_rendered_frame = @image-url("");
+            root._is_last_frame_finished = true; // Consider it "finished" if no animation
+            frame_image.source = root._last_rendered_frame;
+        }
+    }
+
+    // Internal callback to handle changes to the source property or initial loading.
+    callback _handle_source_changed();
+    _handle_source_changed => {
         if (root.lottie_handle >= 0) {
             Lottie.delete_lottie(root.lottie_handle);
             root.lottie_handle = -1;
         }
-        if (!path.empty) {
-            root.lottie_handle = Lottie.load_lottie(path);
+        // Reset frame state before loading new one
+        root._last_rendered_frame = @image-url("placeholder.png"); // Show placeholder during/before load
+        frame_image.source = root._last_rendered_frame; 
+        root._is_last_frame_finished = false;
+
+        if (!root.source.empty) {
+            root.lottie_handle = Lottie.load_lottie(root.source);
             if (root.lottie_handle < 0) {
-                print("Error loading Lottie: \{path}, error code: \{root.lottie_handle}");
+                print("Error loading Lottie: \{root.source}, error code: \{root.lottie_handle}");
                 frame_image.source = @image-url("error.png"); // Optional: show an error image
+                root._last_rendered_frame = frame_image.source;
+                root._is_last_frame_finished = true; // Error state is like "finished"
             } else {
                 // Attempt to render the first frame immediately
-                var frame_data = Lottie.render_frame(root.lottie_handle, "");
-                frame_image.source = frame_data.frame;
-                if (frame_data.is_finished && root.loop) {
+                root._update_current_frame_data(); // This updates _last_rendered_frame and _is_last_frame_finished
+                if (root._is_last_frame_finished && root.loop) {
                     Lottie.reset_animation(root.lottie_handle);
+                    // Optionally, render the very first frame after reset immediately too
+                    // root._update_current_frame_data(); 
                 }
-                // Timer running state will be updated by its binding
             }
         } else {
-            frame_image.source = new image(); // Clear the image
+            // Source is empty, ensure everything is cleared/reset
+            root._update_current_frame_data(); // This will clear images as lottie_handle is -1
         }
     }
 
     init => {
-        root.load_animation(root.source);
+        // Set initial image source before potentially loading.
+        // _handle_source_changed will manage placeholder/error/first_frame.
+        frame_image.source = root._last_rendered_frame;
+        root._handle_source_changed();
     }
 
     source_changed => {
-        root.load_animation(root.source);
+        root._handle_source_changed();
     }
 
     removed => {
@@ -73,7 +107,8 @@ export component LottiePlayer {
 
     Image {
         id: frame_image;
-        source: @image-url("placeholder.png"); // Placeholder for now
+        // source is now managed by _last_rendered_frame and _update_current_frame_data logic
+        source: root._last_rendered_frame;
     }
 
     Timer {
@@ -82,19 +117,17 @@ export component LottiePlayer {
         repeat: true;
         running: root.lottie_handle >= 0 && root.playing;
         triggered => {
-            if (root.lottie_handle >= 0) {
-                var frame_data = Lottie.render_frame(root.lottie_handle, "");
-                frame_image.source = frame_data.frame;
-
-                if (frame_data.is_finished) {
-                    if (root.loop) {
-                        Lottie.reset_animation(root.lottie_handle);
-                        // Optional: render the first frame of the new loop immediately
-                        // var next_frame_data = Lottie.render_frame(root.lottie_handle, "");
-                        // frame_image.source = next_frame_data.frame;
-                    } else {
-                        root.playing = false; // Stop playback if not looping and finished
-                    }
+            // Fetch new frame data (this calls Lottie.render_frame once)
+            root._update_current_frame_data();
+            
+            // Now use the stored properties for logic
+            if (root._is_last_frame_finished) {
+                if (root.loop) {
+                    Lottie.reset_animation(root.lottie_handle);
+                    // Optionally, render the first frame of the new loop immediately
+                    // root._update_current_frame_data(); 
+                } else {
+                    root.playing = false; // Stop playback if not looping and finished
                 }
             }
         }
